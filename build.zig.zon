@@ -1,0 +1,16 @@
+.{
+    .name = "libffi",
+    .version = "3.4.6",
+    .minimum_zig_version = "0.13.0",
+    .paths = .{
+        "LICENSE",
+        "README.md",
+        "build.zig",
+        "build.zig.zon",
+        "fficonfig.zig.h",
+        "include",
+        "lib",
+        "src",
+    },
+    .dependencies = .{},
+}
