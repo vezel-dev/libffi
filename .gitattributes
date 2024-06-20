@@ -2,3 +2,6 @@
 
 *.sln	text eol=crlf
 *.vcxproj*	text eol=crlf
+
+*.zig eol=lf
+*.zon eol=lf
