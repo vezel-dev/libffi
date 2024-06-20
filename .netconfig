@@ -1,0 +1,15 @@
+[file ".editorconfig"]
+	url = https://github.com/vezel-dev/.github/blob/master/syn/.editorconfig
+	sha = 25cfbb6a508a9fcf8444ef283ddfe7b2e5121bca
+	etag = df90691e6bc4d301e82e508fca55eed234028a335c3615cf916db00cb4a053f1
+	weak
+[file ".gitattributes"]
+	url = https://github.com/vezel-dev/.github/blob/master/syn/.gitattributes
+	sha = 428d38cccf66c6af406248aabc81d870c6fbd5d3
+	etag = f2a79dbd60628d2022614ccd48cb1d437fc6be1140215719fc52788df76d5d39
+	weak
+[file ".markdownlint.json"]
+	url = https://github.com/vezel-dev/.github/blob/master/syn/.markdownlint.json
+	sha = 72ec690564533b1ad756f452be9b3ea5075ad124
+	etag = 6d74ad50782defb281b210a627cae9d255cbb419cdc705b0571f1653dbe02300
+	weak
