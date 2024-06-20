@@ -1,0 +1,6 @@
+{
+  "files.exclude": {
+    ".zig-cache": true,
+    "zig-out": true
+  }
+}
