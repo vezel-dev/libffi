@@ -1,0 +1,17 @@
+.{
+    .name = .libffi,
+    .fingerprint = 0x806ae679b444fbef,
+    .version = "3.4.7",
+    .minimum_zig_version = "0.14.0",
+    .paths = .{
+        "LICENSE",
+        "README.md",
+        "build.zig",
+        "build.zig.zon",
+        "fficonfig.zig.h",
+        "include",
+        "lib",
+        "src",
+    },
+    .dependencies = .{},
+}
