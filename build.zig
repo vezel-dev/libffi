@@ -1,28 +1,33 @@
 const std = @import("std");
 
-const name = "libffi";
 const version = "3.4.6"; // TODO: https://github.com/ziglang/zig/issues/14531
 
 pub fn build(b: *std.Build) anyerror!void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const check = b.step("check", "Run source code checks");
-    const fmt = b.step("fmt", "Fix source code formatting");
+    const check_tls = b.step("check", "Run source code checks");
+    const fmt_tls = b.step("fmt", "Fix source code formatting");
 
     const fmt_paths = &[_][]const u8{
         "build.zig",
         "build.zig.zon",
     };
 
-    check.dependOn(&b.addFmt(.{
+    check_tls.dependOn(&b.addFmt(.{
         .paths = fmt_paths,
         .check = true,
     }).step);
 
-    fmt.dependOn(&b.addFmt(.{
+    fmt_tls.dependOn(&b.addFmt(.{
         .paths = fmt_paths,
     }).step);
+
+    _ = b.addModule("ffi", .{
+        .root_source_file = b.path(b.pathJoin(&.{ "lib", "ffi.zig" })),
+        .target = target,
+        .optimize = optimize,
+    });
 
     const lib = b.addStaticLibrary(.{
         .name = "ffi",
@@ -222,13 +227,6 @@ pub fn build(b: *std.Build) anyerror!void {
                 "v9.S",
             };
         },
-        .wasm32 => {
-            arch_name = "wasm32";
-            arch_target = "wasm32";
-            arch_sources = &.{
-                "ffi.c",
-            };
-        },
         .xtensa => {
             arch_name = "xtensa";
             arch_target = "XTENSA";
@@ -258,7 +256,11 @@ pub fn build(b: *std.Build) anyerror!void {
         .linux => t.cpu.arch.isPPC() or t.cpu.arch.isPPC64(),
         else => false,
     };
-    const long_double: LongDouble = if (t.cpu.arch.isMIPS() and (t.os.tag == .freebsd or t.os.tag == .linux or t.os.tag == .openbsd))
+    const long_double: enum {
+        false,
+        true,
+        mips64,
+    } = if (t.cpu.arch.isMIPS() and (t.os.tag == .freebsd or t.os.tag == .linux or t.os.tag == .openbsd))
         .mips64
     else if (long_double_variant or long_double_size > double_size)
         .true
@@ -329,11 +331,11 @@ pub fn build(b: *std.Build) anyerror!void {
         .HAVE_UNISTD_H = true,
         .LIBFFI_GNU_SYMBOL_VERSIONING = null,
         .LT_OBJDIR = null, // Not used.
-        .PACKAGE = name,
+        .PACKAGE = "libffi",
         .PACKAGE_BUGREPORT = "http://github.com/libffi/libffi/issues",
-        .PACKAGE_NAME = name,
-        .PACKAGE_STRING = name ++ " " ++ version,
-        .PACKAGE_TARNAME = name,
+        .PACKAGE_NAME = "libffi",
+        .PACKAGE_STRING = "libffi " ++ version,
+        .PACKAGE_TARNAME = "libffi",
         .PACKAGE_URL = "",
         .PACKAGE_VERSION = version,
         .SIZEOF_DOUBLE = double_size,
@@ -357,12 +359,7 @@ pub fn build(b: *std.Build) anyerror!void {
         lib.addConfigHeader(h);
     }
 
+    // libffi has historically put its header files directly in the include path, rather than a subdirectory.
     lib.installConfigHeader(ffi_h);
     lib.installHeader(b.path(b.pathJoin(&.{ "src", arch_name, "ffitarget.h" })), "ffitarget.h");
 }
-
-const LongDouble = enum {
-    false,
-    true,
-    mips64,
-};

@@ -1,13 +1,14 @@
 # Vezel libffi Fork
 
 This is a friendly fork of [libffi](https://sourceware.org/libffi). The notable
-change made in this fork is the addition of a [Zig](https://ziglang.org) build
-script, making it easy to integrate libffi into Zig projects using the Zig
-package manager. Additionally, to reduce the package download size, we have
-removed a large number of files that are unnecessary when using libffi in a Zig
-project. Importantly, **all library source code is identical to upstream**, so
-in terms of API/ABI compatibility, using this fork is no different from linking
-to a system libffi package.
+changes made in this fork are the additions of a [Zig](https://ziglang.org)
+build script, making it easy to integrate libffi into Zig projects using the Zig
+package manager, and a set of idiomatic Zig bindings for libffi's main API.
+Additionally, to reduce the package download size, we have removed a large
+number of files that are unnecessary when using libffi in a Zig project.
+Importantly, **all library source code is identical to upstream**, so in terms
+of API/ABI compatibility, using this fork is no different from linking to a
+system libffi package.
 
 ## Usage
 
@@ -24,65 +25,50 @@ zig fetch --save=ffi https://github.com/vezel-dev/libffi/archive/vX.Y.Z-B.tar.gz
 zig fetch --save=ffi git+https://github.com/vezel-dev/libffi.git#vX.Y.Z-B
 ```
 
-(You can find the latest libffi version on the
+(You can find the latest version on the
 [releases page](https://github.com/vezel-dev/libffi/releases).)
 
-Then, in your `build.zig`:
+Consume the library in your `build.zig`:
 
 ```zig
-const ffi = b.dependency("ffi", .{});
-exe.linkLibrary(ffi.artifact("ffi"));
+const ffi = b.dependency("ffi", .{
+    .target = target,
+    .optimize = optimize,
+});
 
-// Or, if you want to be able to integrate with a system package:
+exe.root_module.addImport("ffi", ffi.module("ffi"));
+
 if (b.systemIntegrationOption("ffi", .{})) {
     exe.linkSystemLibrary("ffi");
 } else {
-    const ffi = b.dependency("ffi", .{
-        .target = target,
-        .optimize = optimize,
-    });
     exe.linkLibrary(ffi.artifact("ffi"));
 }
 ```
 
-You can then use the C header in your Zig code:
+You can now use the Zig bindings in your code:
 
 ```zig
 const builtin = @import("builtin");
 const std = @import("std");
 const stdio = @cImport(@cInclude("stdio.h"));
-const ffi = @cImport(@cInclude("ffi.h"));
+const ffi = @import("ffi");
 
 pub fn main() !void {
     std.debug.print("Calling C puts() on {s}.\n", .{builtin.cpu.arch.genericName()});
 
-    var cif: ffi.ffi_cif = undefined;
-    var params = [_]?*ffi.ffi_type{
-        &ffi.ffi_type_pointer,
+    var func: ffi.Function = undefined;
+    var params = [_]*ffi.Type{
+        ffi.types.pointer,
     };
 
-    switch (ffi.ffi_prep_cif(
-        &cif,
-        ffi.FFI_DEFAULT_ABI,
-        params.len,
-        &ffi.ffi_type_sint32,
-        params[0..params.len],
-    )) {
-        ffi.FFI_OK => {},
-        else => |e| return switch (e) {
-            ffi.FFI_BAD_TYPEDEF => error.BadTypeDefinition,
-            ffi.FFI_BAD_ABI => error.BadAbi,
-            ffi.FFI_BAD_ARGTYPE => error.BadArgumentType,
-            else => unreachable,
-        },
-    }
+    try func.prepare(ffi.Abi.default, params.len, ffi.types.sint32, params[0..params.len]);
 
-    var result: ffi.ffi_arg = undefined;
-    var args = [params.len]?*anyopaque{
+    var result: ffi.uarg = undefined;
+    var args = [params.len]*anyopaque{
         @ptrCast(@constCast(&"Hello World")),
     };
 
-    ffi.ffi_call(&cif, @ptrCast(&stdio.puts), &result, args[0..args.len]);
+    func.call(@ptrCast(&stdio.puts), &result, args[0..args.len]);
 
     if (result == stdio.EOF)
         return error.IOError;

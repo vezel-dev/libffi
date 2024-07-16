@@ -9,6 +9,7 @@
         "build.zig.zon",
         "fficonfig.zig.h",
         "include",
+        "lib",
         "src",
     },
     .dependencies = .{},
