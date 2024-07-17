@@ -10,3 +10,5 @@ pub const Abi = enum(i32) {
 };
 
 pub const Function = default.Function(Abi);
+
+pub const Closure = default.Closure(Function, 12);

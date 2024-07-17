@@ -2,8 +2,8 @@
 
 const builtin = @import("builtin");
 
-const ffi = @import("ffi.zig");
 const default = @import("default.zig");
+const ffi = @import("ffi.zig");
 
 pub const have_complex_type = builtin.os.tag != .windows;
 
@@ -22,22 +22,32 @@ pub const Abi = enum(i32) {
 
 pub const Function = if (builtin.os.tag.isDarwin()) extern struct {
     abi: Abi,
-    nargs: c_uint,
-    arg_types: ?[*]*ffi.Type,
-    rtype: *ffi.Type,
+    param_count: c_uint,
+    param_types: ?[*]*ffi.Type,
+    return_type: *ffi.Type,
     bytes: c_uint,
     flags: c_uint,
-    aarch64_nfixedargs: c_uint,
+    _private1: c_uint,
 
     pub usingnamespace @import("function.zig");
 } else if (builtin.os.tag == .windows) extern struct {
     abi: Abi,
-    nargs: c_uint,
-    arg_types: ?[*]*ffi.Type,
-    rtype: *ffi.Type,
+    param_count: c_uint,
+    param_types: ?[*]*ffi.Type,
+    return_type: *ffi.Type,
     bytes: c_uint,
     flags: c_uint,
-    is_variadic: c_uint,
+    _private1: c_uint,
 
     pub usingnamespace @import("function.zig");
 } else default.Function(Abi);
+
+pub const Closure = if (builtin.os.tag.isDarwin() and builtin.cpu.arch == .aarch64) extern struct {
+    trampoline_table: *anyopaque align(8),
+    trampoline_table_entry: *anyopaque,
+    function: *Function,
+    wrapper: *const fn (*Function, *anyopaque, ?[*]*anyopaque, ?*anyopaque) callconv(.C) void,
+    datum: ?*anyopaque,
+
+    pub usingnamespace @import("closure.zig");
+} else default.Closure(Function, 24);

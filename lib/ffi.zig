@@ -3,7 +3,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const utils = @import("utils.zig");
 const target = switch (builtin.cpu.arch) {
     .aarch64, .aarch64_be, .aarch64_32 => @import("aarch64.zig"),
     .arc => @import("arc.zig"),
@@ -21,6 +20,7 @@ const target = switch (builtin.cpu.arch) {
     .xtensa => @import("xtensa.zig"),
     else => @compileError("This target is not supported by libffi."),
 };
+const utils = @import("utils.zig");
 
 pub const have_long_double = if (@hasDecl(target, "have_long_double"))
     target.have_long_double
@@ -40,6 +40,7 @@ pub const Status = enum(i32) {
 };
 
 pub const Error = error{
+    OutOfMemory,
     BadTypeDefinition,
     BadAbi,
     BadArgumentType,
@@ -86,34 +87,13 @@ pub const TypeId = if (have_long_double) enum(c_ushort) {
 pub const Type = extern struct {
     size: usize,
     alignment: c_ushort,
-    type: TypeId,
+    id: TypeId,
     elements: ?[*:null]?*Type,
 
     pub fn getElementOffsets(self: *Type, abi: Abi, offsets: [*]usize) Error!void {
         return utils.wrap(ffi_get_struct_offsets(self, abi, offsets));
     }
 };
-
-pub const Abi = target.Abi;
-
-pub const Function = target.Function;
-
-pub extern var ffi_type_void: Type;
-pub extern var ffi_type_uint8: Type;
-pub extern var ffi_type_sint8: Type;
-pub extern var ffi_type_uint16: Type;
-pub extern var ffi_type_sint16: Type;
-pub extern var ffi_type_uint32: Type;
-pub extern var ffi_type_sint32: Type;
-pub extern var ffi_type_uint64: Type;
-pub extern var ffi_type_sint64: Type;
-pub extern var ffi_type_float: Type;
-pub extern var ffi_type_double: Type;
-pub extern var ffi_type_pointer: Type;
-pub extern var ffi_type_longdouble: Type;
-pub extern var ffi_type_complex_float: Type;
-pub extern var ffi_type_complex_double: Type;
-pub extern var ffi_type_complex_longdouble: Type;
 
 pub const types = struct {
     pub const @"void" = &ffi_type_void;
@@ -128,16 +108,16 @@ pub const types = struct {
     pub const float = &ffi_type_float;
     pub const double = &ffi_type_double;
     pub const pointer = &ffi_type_pointer;
-    pub const longDouble = &ffi_type_longdouble;
-    pub const complexFloat = if (have_complex_type)
+    pub const long_double = &ffi_type_longdouble;
+    pub const complex_float = if (have_complex_type)
         &ffi_type_complex_float
     else
         @compileError("This target does not support complex types.");
-    pub const complexDouble = if (have_complex_type)
+    pub const complex_double = if (have_complex_type)
         &ffi_type_complex_double
     else
         @compileError("This target does not support complex types.");
-    pub const complexLongDouble = if (have_complex_type)
+    pub const complex_long_double = if (have_complex_type)
         &ffi_type_complex_longdouble
     else
         @compileError("This target does not support complex types.");
@@ -168,32 +148,72 @@ pub const types = struct {
     };
 };
 
-pub extern fn ffi_prep_cif(
-    cif: *Function,
-    abi: Abi,
-    nargs: c_uint,
-    rtype: *Type,
-    atypes: ?[*]*Type,
-) Status;
+pub const Abi = target.Abi;
 
-pub extern fn ffi_prep_cif_var(
-    cif: *Function,
-    abi: Abi,
-    nfixedargs: c_uint,
-    ntotalargs: c_uint,
-    rtype: *Type,
-    atypes: ?[*]*Type,
-) Status;
+pub const Function = target.Function;
 
-pub extern fn ffi_call(
-    cif: *Function,
-    @"fn": *const fn () callconv(.C) void,
-    rvalue: ?*anyopaque,
-    avalue: ?[*]*anyopaque,
-) void;
+pub const Closure = target.Closure;
+
+pub extern var ffi_type_void: Type;
+pub extern var ffi_type_uint8: Type;
+pub extern var ffi_type_sint8: Type;
+pub extern var ffi_type_uint16: Type;
+pub extern var ffi_type_sint16: Type;
+pub extern var ffi_type_uint32: Type;
+pub extern var ffi_type_sint32: Type;
+pub extern var ffi_type_uint64: Type;
+pub extern var ffi_type_sint64: Type;
+pub extern var ffi_type_float: Type;
+pub extern var ffi_type_double: Type;
+pub extern var ffi_type_pointer: Type;
+pub extern var ffi_type_longdouble: Type;
+pub extern var ffi_type_complex_float: Type;
+pub extern var ffi_type_complex_double: Type;
+pub extern var ffi_type_complex_longdouble: Type;
 
 pub extern fn ffi_get_struct_offsets(
     abi: Abi,
-    struct_type: *Type,
+    @"type": *Type,
     offsets: [*]usize,
+) Status;
+
+pub extern fn ffi_prep_cif(
+    function: *Function,
+    abi: Abi,
+    param_count: c_uint,
+    return_type: *Type,
+    param_types: ?[*]*Type,
+) Status;
+
+pub extern fn ffi_prep_cif_var(
+    function: *Function,
+    abi: Abi,
+    fixed_param_count: c_uint,
+    total_param_count: c_uint,
+    return_type: *Type,
+    param_types: ?[*]*Type,
+) Status;
+
+pub extern fn ffi_call(
+    function: *Function,
+    callee: *const fn () callconv(.C) void,
+    result: ?*anyopaque,
+    args: ?[*]*anyopaque,
+) void;
+
+pub extern fn ffi_closure_alloc(
+    size: usize,
+    code: **const fn () callconv(.C) void,
+) ?*Closure;
+
+pub extern fn ffi_closure_free(
+    closure: *Closure,
+) void;
+
+pub extern fn ffi_prep_closure_loc(
+    closure: *Closure,
+    function: *Function,
+    wrapper: *const fn (*Function, *anyopaque, ?[*]*anyopaque, ?*anyopaque) callconv(.C) void,
+    datum: ?*anyopaque,
+    code: *const fn () callconv(.C) void,
 ) Status;

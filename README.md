@@ -61,14 +61,14 @@ pub fn main() !void {
         ffi.types.pointer,
     };
 
-    try func.prepare(ffi.Abi.default, params.len, ffi.types.sint32, params[0..params.len]);
+    try func.prepare(ffi.Abi.default, params.len, params[0..params.len], ffi.types.sint32);
 
     var result: ffi.uarg = undefined;
     var args = [params.len]*anyopaque{
         @ptrCast(@constCast(&"Hello World")),
     };
 
-    func.call(@ptrCast(&stdio.puts), &result, args[0..args.len]);
+    func.call(&stdio.puts, args[0..args.len], &result);
 
     if (result == stdio.EOF)
         return error.IOError;

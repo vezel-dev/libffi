@@ -2,6 +2,7 @@
 
 const builtin = @import("builtin");
 
+const default = @import("default.zig");
 const ffi = @import("ffi.zig");
 
 pub const have_long_double = switch (builtin.cpu.arch) {
@@ -32,21 +33,31 @@ pub const Abi = enum(i32) {
     _,
 
     pub const default: Abi = switch (builtin.cpu.arch) {
-        .mips, .mipsel => .o32,
-        .mips64, .mips64el => if (builtin.abi == .gnuabi64) .n64 else .n32,
+        .mips, .mipsel => if (builtin.abi.floatAbi() == .soft) .o32_soft_float else .o32,
+        // TODO: std.Target.Abi.muslabin32 is missing.
+        .mips64, .mips64el => if (builtin.abi == .gnuabin32) .n32 else .n64,
         else => unreachable,
     };
 };
 
 pub const Function = extern struct {
     abi: Abi,
-    nargs: c_uint,
-    arg_types: ?[*]*ffi.Type,
-    rtype: *ffi.Type,
+    param_count: c_uint,
+    param_types: ?[*]*ffi.Type,
+    return_type: *ffi.Type,
     bytes: c_uint,
     flags: c_uint,
-    rstruct_flag: c_uint,
-    mips_nfixedargs: c_uint,
+    _private1: c_uint,
+    _private2: c_uint,
 
     pub usingnamespace @import("function.zig");
 };
+
+pub const Closure = default.Closure(Function, switch (builtin.cpu.arch) {
+    .mips, .mipsel => 20,
+    .mips64, .mips64el => switch (builtin.abi) {
+        // TODO: std.Target.Abi.muslabin32 is missing.
+        .gnuabin32 => 20,
+        else => 56,
+    },
+});

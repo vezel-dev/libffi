@@ -2,6 +2,7 @@
 
 const builtin = @import("builtin");
 
+const default = @import("default.zig");
 const ffi = @import("ffi.zig");
 
 pub const Abi = enum(i32) {
@@ -16,13 +17,15 @@ pub const Abi = enum(i32) {
 
 pub const Function = extern struct {
     abi: Abi,
-    nargs: c_uint,
-    arg_types: ?[*]*ffi.Type,
-    rtype: *ffi.Type,
+    param_count: c_uint,
+    param_types: ?[*]*ffi.Type,
+    return_type: *ffi.Type,
     bytes: c_uint,
     flags: c_uint,
-    loongarch_nfixedargs: c_uint,
-    loongarch_unused: c_uint,
+    _private1: c_uint,
+    _private2: c_uint,
 
     pub usingnamespace @import("function.zig");
 };
+
+pub const Closure = default.Closure(Function, 24);

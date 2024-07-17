@@ -2,6 +2,7 @@
 
 const builtin = @import("builtin");
 
+const default = @import("default.zig");
 const ffi = @import("ffi.zig");
 
 pub const have_complex_type = builtin.os.tag != .windows;
@@ -16,15 +17,25 @@ pub const Abi = enum(i32) {
 
 pub const Function = extern struct {
     abi: Abi,
-    nargs: c_uint,
-    arg_types: ?[*]*ffi.Type,
-    rtype: *ffi.Type,
+    param_count: c_uint,
+    param_types: ?[*]*ffi.Type,
+    return_type: *ffi.Type,
     bytes: c_uint,
     flags: c_uint,
-    vfp_used: c_int,
-    vfp_reg_free: c_ushort,
-    vfp_nargs: c_ushort,
-    vfp_args: [16]i8,
+    _private1: c_int,
+    _private2: c_ushort,
+    _private3: c_ushort,
+    _private4: [16]i8,
 
     pub usingnamespace @import("function.zig");
 };
+
+pub const Closure = if (builtin.os.tag.isDarwin()) extern struct {
+    trampoline_table: *anyopaque align(8),
+    trampoline_table_entry: *anyopaque,
+    function: *Function,
+    wrapper: *const fn (*Function, *anyopaque, ?[*]*anyopaque, ?*anyopaque) callconv(.C) void,
+    datum: ?*anyopaque,
+
+    pub usingnamespace @import("closure.zig");
+} else default.Closure(Function, if (builtin.os.tag == .windows) 16 else 12);
