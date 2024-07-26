@@ -300,7 +300,7 @@ pub fn build(b: *std.Build) anyerror!void {
         .FFI_EXEC_TRAMPOLINE_TABLE = if (t.isDarwin() and (t.cpu.arch.isARM() or t.cpu.arch == .aarch64)) true else null,
         .FFI_MMAP_EXEC_EMUTRAMP_PAX = null, // TODO: Perhaps make this configurable.
         .FFI_MMAP_EXEC_WRIT = switch (t.os.tag) {
-            .freebsd, .kfreebsd, .openbsd, .solaris => true,
+            .freebsd, .openbsd, .solaris => true,
             else => if (t.isDarwin() or t.isAndroid()) true else null,
         },
         .FFI_NO_RAW_API = null, // TODO: Perhaps make this configurable.
