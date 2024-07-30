@@ -4,7 +4,7 @@ const builtin = @import("builtin");
 const std = @import("std");
 
 const target = switch (builtin.cpu.arch) {
-    .aarch64, .aarch64_be, .aarch64_32 => @import("aarch64.zig"),
+    .aarch64, .aarch64_be => @import("aarch64.zig"),
     .arc => @import("arc.zig"),
     .arm, .armeb => @import("arm.zig"),
     .avr => @import("avr32.zig"),

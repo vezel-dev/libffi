@@ -7,7 +7,7 @@ const ffi = @import("ffi.zig");
 
 pub const have_complex_type = builtin.os.tag != .windows;
 
-const arg_longlong = builtin.cpu.arch == .aarch64_32 or builtin.os.tag == .windows;
+const arg_longlong = builtin.abi == .gnuilp32 or builtin.os.tag == .windows;
 
 pub const uarg = if (arg_longlong) c_ulonglong else c_ulong;
 pub const sarg = if (arg_longlong) c_longlong else c_long;

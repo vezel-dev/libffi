@@ -60,7 +60,7 @@ pub fn build(b: *std.Build) anyerror!void {
     var arch_sources: []const []const u8 = undefined;
 
     switch (t.cpu.arch) {
-        .aarch64, .aarch64_be, .aarch64_32 => {
+        .aarch64, .aarch64_be => {
             // The assembly files are only usable with MSVC tooling.
             if (t.os.tag == .windows) @panic("No compatible assembly files for aarch64-windows-gnu.");
 
