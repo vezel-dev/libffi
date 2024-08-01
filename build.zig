@@ -217,7 +217,7 @@ pub fn build(b: *std.Build) anyerror!void {
                 "sysv.S",
             };
         },
-        .sparc, .sparc64, .sparcel => {
+        .sparc, .sparc64 => {
             arch_name = "sparc";
             arch_target = "SPARC";
             arch_sources = &.{

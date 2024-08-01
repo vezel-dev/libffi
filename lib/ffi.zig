@@ -16,7 +16,7 @@ const target = switch (builtin.cpu.arch) {
     .powerpc, .powerpcle, .powerpc64, .powerpc64le => @import("powerpc.zig"),
     .riscv32, .riscv64 => @import("riscv.zig"),
     .s390x => @import("s390.zig"),
-    .sparc, .sparc64, .sparcel => @import("sparc.zig"),
+    .sparc, .sparc64 => @import("sparc.zig"),
     .xtensa => @import("xtensa.zig"),
     else => @compileError("This target is not supported by libffi."),
 };
