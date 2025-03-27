@@ -5,14 +5,20 @@ const version = std.SemanticVersion.parse("3.4.7") catch unreachable;
 const version_str = std.fmt.comptimePrint("{}", .{version});
 
 pub fn build(b: *std.Build) anyerror!void {
+    // TODO: https://github.com/ziglang/zig/pull/23239
+    const linkage = b.option(std.builtin.LinkMode, "linkage", "Link binaries statically or dynamically");
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const strip = b.option(bool, "strip", "Omit debug information in binaries");
+    const code_model = b.option(std.builtin.CodeModel, "code-model", "Assume a particular code model") orelse .default;
+    const valgrind = b.option(bool, "valgrind", "Enable Valgrind client requests");
 
     const check_tls = b.step("check", "Run source code checks");
     const fmt_tls = b.step("fmt", "Fix source code formatting");
     const test_tls = b.step("test", "Build and run tests");
 
     const fmt_paths = &[_][]const u8{
+        "lib",
         "build.zig",
         "build.zig.zon",
     };
@@ -28,14 +34,23 @@ pub fn build(b: *std.Build) anyerror!void {
 
     const ffi_mod = b.addModule("ffi", .{
         .root_source_file = b.path(b.pathJoin(&.{ "lib", "ffi.zig" })),
+        .link_libc = true, // libffi requires libc.
+        .single_threaded = false, // libffi requires libpthread.
+        // Inherit other options from consumers of the module.
+    });
+
+    const ffi_lib_mod = b.createModule(.{
         .target = target,
         .optimize = optimize,
-        .link_libc = true,
+        .link_libc = true, // libffi requires libc.
+        .single_threaded = false, // libffi requires libpthread.
+        .strip = strip,
+        .code_model = code_model,
     });
 
     const cflags = &[_][]const u8{"-fexceptions"};
 
-    ffi_mod.addCSourceFiles(.{
+    ffi_lib_mod.addCSourceFiles(.{
         .root = b.path("src"),
         .files = &.{
             "closures.c",
@@ -50,183 +65,184 @@ pub fn build(b: *std.Build) anyerror!void {
 
     const t = target.result;
 
-    var arch_name: []const u8 = undefined;
-    var arch_target: []const u8 = undefined;
-    var arch_sources: []const []const u8 = undefined;
+    const arch_name, const arch_target, const arch_sources: []const []const u8 =
+        switch (t.cpu.arch) {
+            .aarch64, .aarch64_be => blk: {
+                // The assembly files are only usable with MSVC tooling.
+                if (t.os.tag == .windows)
+                    @panic("No compatible assembly files for aarch64-windows-gnu.");
 
-    switch (t.cpu.arch) {
-        .aarch64, .aarch64_be => {
-            // The assembly files are only usable with MSVC tooling.
-            if (t.os.tag == .windows)
-                @panic("No compatible assembly files for aarch64-windows-gnu.");
-
-            arch_name = "aarch64";
-            arch_target = "AARCH64";
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        .arc => {
-            arch_name = "arc";
-            arch_target = "ARC";
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        .arm, .armeb => {
-            // The assembly files are only usable with MSVC tooling.
-            if (t.os.tag == .windows)
-                @panic("No compatible assembly files for arm-windows-gnu.");
-
-            arch_name = "arm";
-            arch_target = "ARM";
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        .csky => {
-            arch_name = "csky";
-            arch_target = "CSKY";
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        .loongarch64 => {
-            arch_name = "loongarch64";
-            arch_target = "LOONGARCH64";
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        .m68k => {
-            arch_name = "m68k";
-            arch_target = "M68K";
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        .mips, .mipsel, .mips64, .mips64el => {
-            arch_name = "mips";
-            arch_target = "MIPS";
-            arch_sources = &.{
-                "ffi.c",
-                "n32.S",
-                "o32.S",
-            };
-        },
-        .powerpc, .powerpcle, .powerpc64, .powerpc64le => {
-            arch_name = "powerpc";
-            arch_target = switch (t.os.tag) {
-                .freebsd, .netbsd, .openbsd => "POWERPC_FREEBSD",
-                .aix => "POWERPC_AIX",
-                else => if (t.os.tag.isDarwin()) "POWERPC_DARWIN" else "POWERPC",
-            };
-            arch_sources = &switch (t.os.tag) {
-                .freebsd, .netbsd, .openbsd => .{
+                break :blk .{
+                    "aarch64",
+                    "AARCH64",
+                    &.{
+                        "ffi.c",
+                        "sysv.S",
+                    },
+                };
+            },
+            .arc => .{
+                "arc",
+                "ARC",
+                &.{
                     "ffi.c",
-                    "ffi_sysv.c",
-                    "ppc_closure.S",
                     "sysv.S",
                 },
-                .aix => .{
-                    "aix.S",
-                    "aix_closure.S",
-                    "ffi_darwin.c",
+            },
+            .arm, .armeb => blk: {
+                // The assembly files are only usable with MSVC tooling.
+                if (t.os.tag == .windows)
+                    @panic("No compatible assembly files for arm-windows-gnu.");
+
+                break :blk .{
+                    "arm",
+                    "ARM",
+                    &.{
+                        "ffi.c",
+                        "sysv.S",
+                    },
+                };
+            },
+            .csky => .{
+                "csky",
+                "CSKY",
+                &.{
+                    "ffi.c",
+                    "sysv.S",
                 },
-                else => if (t.os.tag.isDarwin()) .{
-                    "darwin.S",
-                    "darwin_closure.S",
-                    "ffi_darwin.c",
+            },
+            .loongarch64 => .{
+                "loongarch64",
+                "LOONGARCH64",
+                &.{
+                    "ffi.c",
+                    "sysv.S",
+                },
+            },
+            .m68k => .{
+                "m68k",
+                "M68K",
+                &.{
+                    "ffi.c",
+                    "sysv.S",
+                },
+            },
+            .mips, .mipsel, .mips64, .mips64el => .{
+                "mips",
+                "MIPS",
+                &.{
+                    "ffi.c",
+                    "n32.S",
+                    "o32.S",
+                },
+            },
+            .powerpc, .powerpcle, .powerpc64, .powerpc64le => .{
+                "powerpc",
+                switch (t.os.tag) {
+                    .freebsd, .netbsd, .openbsd => "POWERPC_FREEBSD",
+                    .aix => "POWERPC_AIX",
+                    else => if (t.os.tag.isDarwin()) "POWERPC_DARWIN" else "POWERPC",
+                },
+                &switch (t.os.tag) {
+                    .freebsd, .netbsd, .openbsd => .{
+                        "ffi.c",
+                        "ffi_sysv.c",
+                        "ppc_closure.S",
+                        "sysv.S",
+                    },
+                    .aix => .{
+                        "aix.S",
+                        "aix_closure.S",
+                        "ffi_darwin.c",
+                    },
+                    else => if (t.os.tag.isDarwin()) .{
+                        "darwin.S",
+                        "darwin_closure.S",
+                        "ffi_darwin.c",
+                    } else .{
+                        "ffi.c",
+                        "ffi_linux64.c",
+                        "ffi_sysv.c",
+                        "linux64.S",
+                        "linux64_closure.S",
+                        "ppc_closure.S",
+                        "sysv.S",
+                    },
+                },
+            },
+            .riscv32, .riscv64 => .{
+                "riscv",
+                "RISCV",
+                &.{
+                    "ffi.c",
+                    "sysv.S",
+                },
+            },
+            .s390x => .{
+                "s390",
+                "S390",
+                &.{
+                    "ffi.c",
+                    "sysv.S",
+                },
+            },
+            .sparc, .sparc64 => .{
+                "sparc",
+                "SPARC",
+                &.{
+                    "ffi.c",
+                    "ffi64.c",
+                    "v8.S",
+                    "v9.S",
+                },
+            },
+            .x86 => .{
+                "x86",
+                switch (t.os.tag) {
+                    .freebsd, .openbsd => "X86_FREEBSD",
+                    .windows => "X86_WIN32",
+                    else => if (t.os.tag.isDarwin()) "X86_DARWIN" else "X86",
+                },
+                &.{
+                    "ffi.c",
+                    "sysv.S",
+                },
+            },
+            .x86_64 => .{
+                "x86",
+                if (t.os.tag == .windows) "X86_WIN64" else "X86_64",
+                &if (t.os.tag == .windows) .{
+                    "ffiw64.c",
+                    "win64.S",
+                } else if (t.abi == .gnux32 or t.abi == .muslx32) .{
+                    "ffi64.c",
+                    "unix64.S",
                 } else .{
+                    "ffi64.c",
+                    "ffiw64.c",
+                    "unix64.S",
+                    "win64.S",
+                },
+            },
+            .xtensa => .{
+                "xtensa",
+                "XTENSA",
+                &.{
                     "ffi.c",
-                    "ffi_linux64.c",
-                    "ffi_sysv.c",
-                    "linux64.S",
-                    "linux64_closure.S",
-                    "ppc_closure.S",
                     "sysv.S",
                 },
-            };
-        },
-        .riscv32, .riscv64 => {
-            arch_name = "riscv";
-            arch_target = "RISCV";
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        .s390x => {
-            arch_name = "s390";
-            arch_target = "S390";
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        .sparc, .sparc64 => {
-            arch_name = "sparc";
-            arch_target = "SPARC";
-            arch_sources = &.{
-                "ffi.c",
-                "ffi64.c",
-                "v8.S",
-                "v9.S",
-            };
-        },
-        .x86 => {
-            arch_name = "x86";
-            arch_target = switch (t.os.tag) {
-                .freebsd, .openbsd => "X86_FREEBSD",
-                .windows => "X86_WIN32",
-                else => if (t.os.tag.isDarwin()) "X86_DARWIN" else "X86",
-            };
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        .x86_64 => {
-            arch_name = "x86";
-            arch_target = if (t.os.tag == .windows) "X86_WIN64" else "X86_64";
-            arch_sources = &if (t.os.tag == .windows) .{
-                "ffiw64.c",
-                "win64.S",
-            } else if (t.abi == .gnux32 or t.abi == .muslx32) .{
-                "ffi64.c",
-                "unix64.S",
-            } else .{
-                "ffi64.c",
-                "ffiw64.c",
-                "unix64.S",
-                "win64.S",
-            };
-        },
-        .xtensa => {
-            arch_name = "xtensa";
-            arch_target = "XTENSA";
-            arch_sources = &.{
-                "ffi.c",
-                "sysv.S",
-            };
-        },
-        else => @panic("This target is not supported by libffi."),
-    }
+            },
+            else => @panic("This target is not supported by libffi."),
+        };
 
-    ffi_mod.addCSourceFiles(.{
+    ffi_lib_mod.addCSourceFiles(.{
         .root = b.path(b.pathJoin(&.{ "src", arch_name })),
         .files = arch_sources,
         .flags = cflags,
     });
 
     inline for (.{ "include", "src", b.pathJoin(&.{ "src", arch_name }) }) |inc|
-        ffi_mod.addIncludePath(b.path(inc));
+        ffi_lib_mod.addIncludePath(b.path(inc));
 
     const double_size = t.cTypeByteSize(.double);
     const long_double_size = t.cTypeByteSize(.longdouble);
@@ -336,36 +352,39 @@ pub fn build(b: *std.Build) anyerror!void {
     }
 
     inline for (.{ fficonfig_h, ffi_h }) |hdr|
-        ffi_mod.addConfigHeader(hdr);
+        ffi_lib_mod.addConfigHeader(hdr);
 
-    const lib = b.addLibrary(.{
-        .linkage = .static,
+    const lib_step = b.addLibrary(.{
+        .linkage = linkage orelse .static,
         .name = "ffi",
-        .root_module = ffi_mod,
+        .root_module = ffi_lib_mod,
         .version = version,
     });
 
-    b.installArtifact(lib);
+    b.installArtifact(lib_step);
 
     // libffi has historically put its header files directly in the include path, rather than a subdirectory.
-    lib.installConfigHeader(ffi_h);
-    lib.installHeader(b.path(b.pathJoin(&.{ "src", arch_name, "ffitarget.h" })), "ffitarget.h");
+    lib_step.installConfigHeader(ffi_h);
+    lib_step.installHeader(b.path(b.pathJoin(&.{ "src", arch_name, "ffitarget.h" })), "ffitarget.h");
 
     const example_mod = b.createModule(.{
         .root_source_file = b.path("example.zig"),
         .target = target,
         .optimize = optimize,
+        .strip = strip,
+        .code_model = code_model,
+        .valgrind = valgrind,
     });
 
     example_mod.addImport("ffi", ffi_mod);
+    example_mod.linkLibrary(lib_step);
 
-    const example = b.addExecutable(.{
-        .name = "libffi-example",
+    const run_example_step = b.addRunArtifact(b.addExecutable(.{
+        .linkage = linkage,
+        .name = "ffi-example",
         .root_module = example_mod,
         .version = version,
-    });
-
-    const run_example_step = b.addRunArtifact(example);
+    }));
 
     // Always run the example when requested, even if the binary has not changed.
     run_example_step.has_side_effects = true;

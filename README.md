@@ -21,9 +21,9 @@ Please note that the `master` branch is rebased on top of upstream periodically.
 **You should use a release tag rather than `master`.** For example:
 
 ```bash
-zig fetch --save=ffi https://github.com/vezel-dev/libffi/archive/vX.Y.Z-B.tar.gz
+zig fetch --save=libffi https://github.com/vezel-dev/libffi/archive/vX.Y.Z-B.tar.gz
 # Or, to use Git:
-zig fetch --save=ffi git+https://github.com/vezel-dev/libffi.git#vX.Y.Z-B
+zig fetch --save=libffi git+https://github.com/vezel-dev/libffi.git#vX.Y.Z-B
 ```
 
 (You can find the latest version on the
@@ -32,17 +32,17 @@ zig fetch --save=ffi git+https://github.com/vezel-dev/libffi.git#vX.Y.Z-B
 Consume the library in your `build.zig`:
 
 ```zig
-const ffi = b.dependency("ffi", .{
+const libffi = b.dependency("libffi", .{
     .target = target,
     .optimize = optimize,
 });
 
-exe.root_module.addImport("ffi", ffi.module("ffi"));
+exe.root_module.addImport("ffi", libffi.module("ffi"));
 
 if (b.systemIntegrationOption("ffi", .{})) {
-    exe.linkSystemLibrary("ffi");
+    exe.root_module.linkSystemLibrary("ffi", .{});
 } else {
-    exe.linkLibrary(ffi.artifact("ffi"));
+    exe.root_module.linkLibrary(libffi.artifact("ffi"));
 }
 ```
 
