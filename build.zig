@@ -297,7 +297,7 @@ pub fn build(b: *std.Build) anyerror!void {
         .EH_FRAME_FLAGS = "a",
         .FFI_DEBUG = null,
         .FFI_EXEC_STATIC_TRAMP = switch (t.os.tag) {
-            .linux => if (t.cpu.arch.isArm() or t.cpu.arch.isAARCH64() or t.cpu.arch.isLoongArch() or t.cpu.arch == .s390x or t.cpu.arch.isX86()) true else null,
+            .linux => if (t.cpu.arch.isArm() or t.cpu.arch.isAARCH64() or t.cpu.arch.isLoongArch() or t.cpu.arch.isPowerPC() or t.cpu.arch == .s390x or t.cpu.arch.isX86()) true else null,
             else => null,
         },
         .FFI_EXEC_TRAMPOLINE_TABLE = if (t.cpu.arch == .aarch64 and t.os.tag.isDarwin()) true else null,
