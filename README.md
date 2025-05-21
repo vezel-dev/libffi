@@ -1,5 +1,10 @@
 # Vezel libffi Fork
 
+> [!WARNING]
+> [This repository has moved to Codeberg.](https://codeberg.org/vezel/libffi)
+> Please update your `build.zig.zon` as necessary. The GitHub repository has
+> been archived and will not see further development.
+
 This is a friendly fork of [libffi](https://sourceware.org/libffi). The notable
 changes made in this fork are the additions of a [Zig](https://ziglang.org)
 build script, making it easy to integrate libffi into Zig projects using the Zig
